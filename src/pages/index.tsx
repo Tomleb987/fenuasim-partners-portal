@@ -1,11 +1,12 @@
-// src/pages/index.tsx
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { LogOut, TrendingUp, Tag, Calendar, User } from "lucide-react"
+import { useRouter } from "next/router"
+import { LogOut, TrendingUp, Tag, Calendar, User, ShoppingBag } from "lucide-react"
 import { supabaseBrowser } from "@/lib/supabase-browser"
 
 export default function PartnerDashboard() {
   const supabase = useMemo(() => supabaseBrowser(), [])
+  const router = useRouter()
 
   const [sales, setSales] = useState<any[]>([])
   const [profile, setProfile] = useState<any>(null)
@@ -17,7 +18,7 @@ export default function PartnerDashboard() {
     const fetchStats = async () => {
       setLoading(true)
 
-      // 1) Session (cookies) : cohérent avec middleware
+      // 1) Vérification de la session via cookies (cohérent avec le middleware)
       const { data: sessionData } = await supabase.auth.getSession()
       const user = sessionData.session?.user
 
@@ -26,7 +27,7 @@ export default function PartnerDashboard() {
         return
       }
 
-      // 2) Profil partenaire
+      // 2) Récupération du profil partenaire
       const { data: prof, error: profErr } = await supabase
         .from("partner_profiles")
         .select("*")
@@ -65,7 +66,7 @@ export default function PartnerDashboard() {
 
     fetchStats()
 
-    // Si session change (logout ailleurs), on sort
+    // Gestion automatique de la déconnexion
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) window.location.href = "/login"
     })
@@ -89,26 +90,16 @@ export default function PartnerDashboard() {
     )
   }
 
-  // Profil introuvable / pas encore activé (RLS, ligne manquante, etc.)
+  // Cas où l'utilisateur est authentifié mais n'a pas de fiche dans partner_profiles
   if (!profile) {
     return (
       <div className="min-h-screen bg-[#fafafa] font-sans">
         <nav className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 py-6 sticky top-0 z-50 shadow-sm">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
             <div className="relative h-16 w-40">
-              <Image
-                src="/logo-1.png"
-                alt="Fenuasim Logo"
-                fill
-                className="object-contain"
-                priority
-              />
+              <Image src="/logo-1.png" alt="Fenuasim Logo" fill className="object-contain" priority />
             </div>
-
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-2 text-gray-400 font-bold hover:text-red-500 transition-all uppercase text-xs tracking-widest"
-            >
+            <button onClick={handleSignOut} className="flex items-center gap-2 text-gray-400 font-bold hover:text-red-500 transition-all uppercase text-xs tracking-widest">
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Déconnexion</span>
             </button>
@@ -120,20 +111,12 @@ export default function PartnerDashboard() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-[10px] font-black uppercase tracking-widest mb-4">
               <User className="w-3 h-3" /> Accès incomplet
             </div>
-            <h1 className="text-2xl font-extrabold text-gray-900">
-              Votre profil partenaire n’est pas encore activé
-            </h1>
+            <h1 className="text-2xl font-extrabold text-gray-900">Votre profil partenaire n’est pas encore activé</h1>
             <p className="text-gray-500 text-sm mt-2">
-              Nous ne trouvons pas votre fiche dans <span className="font-mono">partner_profiles</span>.
+              Nous ne trouvons pas votre fiche dans <span className="font-mono text-purple-600">partner_profiles</span>. 
               Contactez l’équipe FENUA SIM pour finaliser l’activation.
             </p>
-
-            <button
-              onClick={handleSignOut}
-              className="mt-6 rounded-xl px-4 py-2 text-sm font-medium text-white
-                         bg-gradient-to-r from-orange-500 via-fuchsia-500 to-violet-600
-                         hover:brightness-110 transition"
-            >
+            <button onClick={handleSignOut} className="mt-6 rounded-xl px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-orange-500 via-fuchsia-500 to-violet-600 hover:brightness-110 transition">
               Se déconnecter
             </button>
           </div>
@@ -144,23 +127,14 @@ export default function PartnerDashboard() {
 
   return (
     <div className="min-h-screen bg-[#fafafa] font-sans pb-20">
-      {/* HEADER */}
+      {/* HEADER AVEC LOGO */}
       <nav className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 py-6 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="relative h-16 w-40">
-            <Image
-              src="/logo-1.png"
-              alt="Fenuasim Logo"
-              fill
-              className="object-contain"
-              priority
-            />
+            <Image src="/logo-1.png" alt="Fenuasim Logo" fill className="object-contain" priority />
           </div>
 
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-2 text-gray-400 font-bold hover:text-red-500 transition-all uppercase text-xs tracking-widest"
-          >
+          <button onClick={handleSignOut} className="flex items-center gap-2 text-gray-400 font-bold hover:text-red-500 transition-all uppercase text-xs tracking-widest">
             <LogOut className="w-4 h-4" />
             <span className="hidden sm:inline">Déconnexion</span>
           </button>
@@ -168,91 +142,74 @@ export default function PartnerDashboard() {
       </nav>
 
       <main className="max-w-6xl mx-auto px-6 mt-16">
-        {/* Bienvenue */}
-        <header className="mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-[10px] font-black uppercase tracking-widest mb-4">
-            <User className="w-3 h-3" /> Espace Conseiller
-          </div>
-          <h2 className="text-4xl font-extrabold text-gray-900 leading-tight">
-            Heureux de vous voir, <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-orange-500">
-              {profile?.advisor_name || "Partenaire"}
-            </span>
-          </h2>
-        </header>
+        {/* SECTION BIENVENUE ET BOUTON BOUTIQUE */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
+          <header>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-[10px] font-black uppercase tracking-widest mb-4">
+              <User className="w-3 h-3" /> Espace Conseiller
+            </div>
+            <h2 className="text-4xl font-extrabold text-gray-900 leading-tight">
+              Heureux de vous voir, <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-orange-500">
+                {profile?.advisor_name || "Partenaire"}
+              </span>
+            </h2>
+          </header>
 
-        {/* Stats */}
+          {/* Bouton vers le Shop */}
+          <button 
+            onClick={() => router.push('/shop')}
+            className="group flex items-center gap-3 bg-orange-500 hover:bg-orange-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-orange-100 transition-all active:scale-95"
+          >
+            <ShoppingBag className="w-5 h-5 group-hover:animate-bounce" />
+            MA BOUTIQUE
+          </button>
+        </div>
+
+        {/* GRILLE DE STATISTIQUES */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
           <div className="bg-gradient-to-br from-purple-600 to-purple-800 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-purple-200 relative overflow-hidden group">
             <TrendingUp className="absolute right-[-10px] bottom-[-10px] w-32 h-32 opacity-10 group-hover:scale-110 transition-transform duration-500" />
-            <p className="text-purple-200 font-bold uppercase tracking-widest text-xs mb-2">
-              Ventes réalisées
-            </p>
+            <p className="text-purple-200 font-bold uppercase tracking-widest text-xs mb-2">Ventes réalisées</p>
             <p className="text-6xl font-black">{sales.length}</p>
           </div>
 
           <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-100 relative overflow-hidden group">
             <Tag className="absolute right-[-10px] bottom-[-10px] w-32 h-32 text-orange-50 opacity-50 group-hover:scale-110 transition-transform duration-500" />
-            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mb-2">
-              Votre Code Partenaire
-            </p>
-            <p className="text-6xl font-black text-orange-500">
-              {profile?.partner_code || "---"}
-            </p>
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mb-2">Votre Code Partenaire</p>
+            <p className="text-6xl font-black text-orange-500">{profile?.partner_code || "---"}</p>
           </div>
         </div>
 
-        {/* Historique */}
+        {/* TABLEAU HISTORIQUE */}
         <div className="bg-white rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100 overflow-hidden">
           <div className="p-8 border-b border-gray-50 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Calendar className="w-6 h-6 text-purple-600" />
-              <h3 className="text-xl font-bold text-gray-900">
-                Historique des commandes
-              </h3>
+              <h3 className="text-xl font-bold text-gray-900">Historique des commandes</h3>
             </div>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">
-              Derniers 30 jours
-            </span>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">Derniers 30 jours</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-gray-50/50">
-                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">
-                    Date
-                  </th>
-                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">
-                    Référence
-                  </th>
-                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">
-                    Montant
-                  </th>
-                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em] text-right">
-                    Statut
-                  </th>
+                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">Date</th>
+                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">Référence</th>
+                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">Montant</th>
+                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em] text-right">Statut</th>
                 </tr>
               </thead>
-
               <tbody className="divide-y divide-gray-50">
                 {sales.length > 0 ? (
                   sales.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="hover:bg-purple-50/30 transition-colors"
-                    >
+                    <tr key={order.id} className="hover:bg-purple-50/30 transition-colors">
                       <td className="p-6 text-gray-600 font-medium text-sm">
-                        {order.created_at
-                          ? new Date(order.created_at).toLocaleDateString("fr-FR")
-                          : "-"}
+                        {order.created_at ? new Date(order.created_at).toLocaleDateString("fr-FR") : "-"}
                       </td>
-                      <td className="p-6 text-gray-400 font-mono text-xs italic">
-                        #{String(order.id).slice(0, 8)}
-                      </td>
-                      <td className="p-6 text-gray-900 font-black text-lg">
-                        {order.total_amount} €
-                      </td>
+                      <td className="p-6 text-gray-400 font-mono text-xs italic">#{String(order.id).slice(0, 8)}</td>
+                      <td className="p-6 text-gray-900 font-black text-lg">{order.total_amount} €</td>
                       <td className="p-6 text-right">
                         <span className="px-4 py-1.5 rounded-full text-[10px] font-black bg-green-100 text-green-700 uppercase tracking-widest">
                           {order.status || "Validé"}
@@ -262,9 +219,7 @@ export default function PartnerDashboard() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="p-20 text-center text-gray-300 font-medium">
-                      Aucune vente enregistrée pour le moment.
-                    </td>
+                    <td colSpan={4} className="p-20 text-center text-gray-300 font-medium">Aucune vente enregistrée pour le moment.</td>
                   </tr>
                 )}
               </tbody>
