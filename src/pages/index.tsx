@@ -1,118 +1,67 @@
-import { useEffect, useState } from 'react';
-// Correction de l'import : on utilise le chemin relatif au lieu de l'alias @
+import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useRouter } from 'next/router';
+import { Smartphone, ShieldCheck, Wifi } from 'lucide-react';
 
-export default function PartnerDashboard() {
-  const [sales, setSales] = useState<any[]>([]);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        // 1. Récupérer l'utilisateur connecté
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // 2. Récupérer son profil partenaire
-        const { data: prof, error: profError } = await supabase
-          .from('partner_profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        
-        if (profError) throw profError;
-        setProfile(prof);
-
-        // 3. Récupérer les ventes associées à son code partenaire
-        if (prof?.partner_code) {
-          const { data: ord, error: ordError } = await supabase
-            .from('orders')
-            .select('*')
-            .eq('partner_code', prof.partner_code)
-            .order('created_at', { ascending: false });
-          
-          if (ordError) throw ordError;
-          setSales(ord || []);
-        }
-      } catch (err) {
-        console.error("Erreur de chargement :", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
-  }, []);
-
-  if (loading) return <div className="p-8 text-center">Chargement de votre espace...</div>;
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) alert("Erreur : " + error.message);
+    else router.push('/');
+    setLoading(false);
+  };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto font-sans">
-      <header className="flex justify-between items-center mb-10">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Bienvenue, {profile?.advisor_name || 'Partenaire'}</h1>
-          <p className="text-gray-500">Suivi de vos performances en temps réel</p>
-        </div>
-        <button 
-          onClick={() => supabase.auth.signOut()}
-          className="text-sm font-medium text-red-600 hover:text-red-800"
-        >
-          Déconnexion
-        </button>
-      </header>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-        <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm">
-          <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Ventes totales</p>
-          <p className="text-4xl font-black text-blue-600 mt-2">{sales.length}</p>
-        </div>
-        <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm">
-          <p className="text-gray-500 text-sm font-medium uppercase tracking-wider">Mon Code Promo</p>
-          <p className="text-4xl font-black text-green-600 mt-2">{profile?.partner_code || '---'}</p>
-        </div>
-      </div>
+    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden font-sans">
+      {/* Éléments de design (Bulles de couleur comme sur l'accueil) */}
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
 
-      <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">Historique des commandes</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-gray-600 text-sm uppercase">
-              <tr>
-                <th className="px-6 py-4 font-semibold">Date</th>
-                <th className="px-6 py-4 font-semibold">Référence</th>
-                <th className="px-6 py-4 font-semibold">Montant</th>
-                <th className="px-6 py-4 font-semibold">Statut</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {sales.length > 0 ? sales.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 text-sm text-gray-700">
-                    {new Date(order.created_at).toLocaleDateString('fr-FR')}
-                  </td>
-                  <td className="px-6 py-4 text-sm font-mono text-gray-500">
-                    #{order.id.slice(0, 8)}
-                  </td>
-                  <td className="px-6 py-4 text-sm font-bold text-gray-900">
-                    {order.total_amount || 0} €
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                      {order.status || 'Validé'}
-                    </span>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={4} className="px-6 py-10 text-center text-gray-400">
-                    Aucune vente enregistrée pour le moment.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      <div className="relative z-10 max-w-md w-full px-4">
+        <div className="bg-white/80 backdrop-blur-xl p-10 rounded-[2rem] shadow-2xl border border-white/50">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+              FENUA<span className="text-orange-500">SIM</span>
+            </h1>
+            <p className="text-purple-700 text-sm font-bold mt-2 uppercase tracking-widest flex items-center justify-center gap-2">
+              <ShieldCheck className="w-4 h-4" /> Espace Partenaire
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <input 
+                type="email" placeholder="Email professionnel" required
+                className="w-full p-4 bg-white border border-purple-100 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all shadow-sm"
+                onChange={(e) => setEmail(e.target.value)} 
+              />
+            </div>
+            <div>
+              <input 
+                type="password" placeholder="Mot de passe" required
+                className="w-full p-4 bg-white border border-purple-100 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all shadow-sm"
+                onChange={(e) => setPassword(e.target.value)} 
+              />
+            </div>
+            <button 
+              type="submit" disabled={loading}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-purple-200 transition-all active:scale-95"
+            >
+              {loading ? 'Connexion...' : 'Se connecter'}
+            </button>
+          </form>
+
+          <div className="mt-8 flex justify-center gap-6 text-purple-400">
+             <Wifi className="w-5 h-5" />
+             <Smartphone className="w-5 h-5" />
+          </div>
         </div>
       </div>
     </div>
