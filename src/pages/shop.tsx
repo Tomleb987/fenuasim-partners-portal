@@ -7,15 +7,12 @@ import { supabaseBrowser } from "@/lib/supabase-browser"
 
 type Product = {
   id: string
-  country?: string | null
   country_name?: string | null
   title?: string | null
   name?: string | null
   data_gb?: number | null
   duration_days?: number | null
-  price_eur?: number | null
-  price?: number | null
-  currency?: string | null
+  final_price_eur?: number | null
 }
 
 export default function PartnerShopPage() {
@@ -28,7 +25,6 @@ export default function PartnerShopPage() {
 
   const [partnerCode, setPartnerCode] = useState<string | null>(null)
   const [advisorName, setAdvisorName] = useState<string | null>(null)
-
   const [products, setProducts] = useState<Product[]>([])
 
   useEffect(() => {
@@ -45,7 +41,7 @@ export default function PartnerShopPage() {
         return
       }
 
-      // Profil partenaire (code + nom)
+      // Profil partenaire
       const { data: prof, error: profErr } = await supabase
         .from("partner_profiles")
         .select("partner_code, advisor_name")
@@ -67,12 +63,11 @@ export default function PartnerShopPage() {
       setPartnerCode(prof.partner_code)
       setAdvisorName(prof.advisor_name ?? null)
 
-      // ✅ Produits : par défaut on lit airalo_packages (adapte si ton schéma diffère)
-      // Champs attendus : id, country_name/title/name, data_gb, duration_days, price_eur (ou price)
+      // ✅ Produits Airalo : final_price_eur
       const { data: packs, error: packsErr } = await supabase
         .from("airalo_packages")
-        .select("id, country_name, title, name, data_gb, duration_days, price_eur, price, currency")
-        .order("price_eur", { ascending: true })
+        .select("id, country_name, title, name, data_gb, duration_days, final_price_eur")
+        .order("final_price_eur", { ascending: true })
 
       if (packsErr) {
         if (mounted) {
@@ -110,14 +105,8 @@ export default function PartnerShopPage() {
     setPayingId(product.id)
 
     try {
-      const price =
-        typeof product.price_eur === "number"
-          ? product.price_eur
-          : typeof product.price === "number"
-            ? product.price
-            : null
-
-      if (!price) throw new Error("Prix produit introuvable.")
+      const price = typeof product.final_price_eur === "number" ? product.final_price_eur : null
+      if (!price) throw new Error("Prix produit introuvable (final_price_eur).")
 
       const name =
         product.title ||
@@ -125,42 +114,25 @@ export default function PartnerShopPage() {
         product.country_name ||
         "Forfait eSIM"
 
-      // Panier minimal (un item) — le partner_code est FORCÉ côté serveur
       const cartItems = [
-        {
-          name,
-          price,
-          quantity: 1,
-          product_id: product.id,
-        },
+        { name, price, quantity: 1, product_id: product.id },
       ]
 
       const r = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cartItems,
-          customer_email: null,
-        }),
+        body: JSON.stringify({ cartItems, customer_email: null }),
       })
 
       const json = await r.json()
       if (!r.ok) throw new Error(json?.error || "Erreur création paiement.")
 
-      // Stripe Checkout : on redirige vers l’URL si fournie, sinon on navigue via sessionId
       if (json?.url) {
         window.location.href = json.url
         return
       }
 
-      // fallback (si tu ne renvoies que sessionId)
-      if (json?.sessionId) {
-        // Si tu utilises stripe-js côté client, tu peux rediriger via redirectToCheckout.
-        // Ici on reste simple : on laisse l’API renvoyer url idéalement.
-        throw new Error("URL Stripe manquante. Ajustez l’API pour renvoyer checkoutSession.url.")
-      }
-
-      throw new Error("Réponse paiement invalide.")
+      throw new Error("URL Stripe manquante (checkoutSession.url).")
     } catch (e: any) {
       setError(e?.message ?? "Erreur inconnue.")
       setPayingId(null)
@@ -195,8 +167,7 @@ export default function PartnerShopPage() {
                   <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                     Code Partenaire
                   </span>
-                  <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest
-                                   bg-orange-100 text-orange-600">
+                  <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-orange-100 text-orange-600">
                     {partnerCode}
                   </span>
                 </div>
@@ -251,72 +222,58 @@ export default function PartnerShopPage() {
             <div className="min-h-[50vh] flex items-center justify-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" />
             </div>
+          ) : products.length === 0 ? (
+            <div className="rounded-3xl bg-white border border-gray-100 shadow-sm p-10 text-center text-gray-500">
+              Aucune offre disponible pour le moment.
+            </div>
           ) : (
-            <>
-              {products.length === 0 ? (
-                <div className="rounded-3xl bg-white border border-gray-100 shadow-sm p-10 text-center text-gray-500">
-                  Aucune offre disponible pour le moment.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {products.map((p) => {
-                    const price =
-                      typeof p.price_eur === "number"
-                        ? p.price_eur
-                        : typeof p.price === "number"
-                          ? p.price
-                          : null
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {products.map((p) => {
+                const price = typeof p.final_price_eur === "number" ? p.final_price_eur : null
+                const title = p.title || p.name || p.country_name || "Forfait eSIM"
 
-                    const title =
-                      p.title ||
-                      p.name ||
-                      p.country_name ||
-                      "Forfait eSIM"
-
-                    return (
-                      <div
-                        key={p.id}
-                        className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 hover:shadow-md transition"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-gray-900 font-extrabold text-lg">{title}</p>
-                            <p className="text-gray-400 text-sm mt-1">
-                              {p.data_gb ? `${p.data_gb} Go` : "Data"}{" "}
-                              {p.duration_days ? `• ${p.duration_days} jours` : ""}
-                            </p>
-                          </div>
-
-                          <div className="text-right">
-                            <p className="text-gray-900 font-black text-xl">
-                              {price !== null ? `${price.toFixed(2)} €` : "—"}
-                            </p>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                              Paiement sécurisé
-                            </p>
-                          </div>
-                        </div>
-
-                        <button
-                          disabled={payingId === p.id || price === null}
-                          onClick={() => startCheckout(p)}
-                          className="mt-6 w-full rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-widest
-                                     text-white disabled:opacity-60
-                                     bg-gradient-to-r from-orange-500 via-fuchsia-500 to-violet-600
-                                     hover:brightness-110 transition"
-                        >
-                          {payingId === p.id ? "Redirection…" : "Acheter"}
-                        </button>
-
-                        <p className="mt-3 text-xs text-gray-400">
-                          Attribution automatique : <span className="font-mono">{partnerCode}</span>
+                return (
+                  <div
+                    key={p.id}
+                    className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 hover:shadow-md transition"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-gray-900 font-extrabold text-lg">{title}</p>
+                        <p className="text-gray-400 text-sm mt-1">
+                          {p.data_gb ? `${p.data_gb} Go` : "Data"}
+                          {p.duration_days ? ` • ${p.duration_days} jours` : ""}
                         </p>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </>
+
+                      <div className="text-right">
+                        <p className="text-gray-900 font-black text-xl">
+                          {price !== null ? `${price.toFixed(2)} €` : "—"}
+                        </p>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                          Paiement sécurisé
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      disabled={payingId === p.id || price === null}
+                      onClick={() => startCheckout(p)}
+                      className="mt-6 w-full rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-widest
+                                 text-white disabled:opacity-60
+                                 bg-gradient-to-r from-orange-500 via-fuchsia-500 to-violet-600
+                                 hover:brightness-110 transition"
+                    >
+                      {payingId === p.id ? "Redirection…" : "Acheter"}
+                    </button>
+
+                    <p className="mt-3 text-xs text-gray-400">
+                      Attribution : <span className="font-mono">{partnerCode}</span>
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </main>
       </div>
