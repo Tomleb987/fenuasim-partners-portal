@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'next/router';
-import { ShieldCheck, Wifi } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -22,10 +22,16 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="bg-white/80 backdrop-blur-2xl p-10 rounded-[2.5rem] shadow-2xl border border-white">
           <div className="text-center mb-10">
-            <h1 className="text-4xl font-black text-gray-900">
-              FENUA<span className="text-orange-500">SIM</span>
-            </h1>
-            <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-bold uppercase tracking-widest">
+            {/* --- DÉBUT DU CHANGEMENT --- */}
+            {/* Utilisation du logo 1.png situé dans le dossier public */}
+            <img 
+              src="/logo 1.png" 
+              alt="Fenuasim Logo" 
+              className="h-20 w-auto mx-auto mb-6" // J'ai mis h-20 (80px) pour une bonne visibilité, ajustez si besoin.
+            />
+            {/* --- FIN DU CHANGEMENT --- */}
+            
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-bold uppercase tracking-widest">
               <ShieldCheck className="w-3 h-3" /> Accès Partenaire
             </div>
           </div>
@@ -33,12 +39,12 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <input 
               type="email" placeholder="Email professionnel" required
-              className="w-full p-4 bg-white/50 border border-purple-100 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+              className="w-full p-4 bg-white/50 border border-purple-100 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all placeholder-gray-400 font-medium"
               onChange={(e) => setEmail(e.target.value)} 
             />
             <input 
               type="password" placeholder="Mot de passe" required
-              className="w-full p-4 bg-white/50 border border-purple-100 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+              className="w-full p-4 bg-white/50 border border-purple-100 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all placeholder-gray-400 font-medium"
               onChange={(e) => setPassword(e.target.value)} 
             />
             <button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-purple-200 transition-all active:scale-95">
