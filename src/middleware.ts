@@ -1,42 +1,79 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
+import { createServerClient } from "@supabase/ssr";
+
+function getEnv() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  }
+  return { url, anonKey };
+}
+
+function createSupabase(req: NextRequest, res: NextResponse) {
+  const { url, anonKey } = getEnv();
+
+  return createServerClient(url, anonKey, {
+    cookies: {
+      get(name: string) {
+        return req.cookies.get(name)?.value;
+      },
+      set(name: string, value: string, options: any) {
+        // NextResponse cookies API
+        res.cookies.set({
+          name,
+          value,
+          ...options,
+        });
+      },
+      remove(name: string, options: any) {
+        res.cookies.set({
+          name,
+          value: "",
+          ...options,
+          maxAge: 0,
+        });
+      },
+    },
+  });
+}
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req, res });
-
-  // IMPORTANT: on laisse Stripe webhook tranquille
+  // Laisse Stripe webhook public
   if (req.nextUrl.pathname.startsWith("/api/stripe/webhook")) {
-    return res;
+    return NextResponse.next();
   }
 
-  // Routes publiques
-  const publicPaths = ["/login", "/"];
-  const isPublic = publicPaths.includes(req.nextUrl.pathname);
+  const res = NextResponse.next();
+  const supabase = createSupabase(req, res);
 
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
-  // Si pas connecté et route non publique => redirect login
-  if (!session && !isPublic && !req.nextUrl.pathname.startsWith("/api")) {
+  const publicPaths = ["/", "/login"];
+  const isPublic = publicPaths.includes(req.nextUrl.pathname);
+
+  // Bloquer uniquement les pages (pas les /api/*)
+  const isApi = req.nextUrl.pathname.startsWith("/api");
+
+  if (!session && !isPublic && !isApi) {
     const redirectUrl = req.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("redirect", req.nextUrl.pathname);
-    return NextResponse.redirect(redirectUrl);
+
+    const redirectRes = NextResponse.redirect(redirectUrl);
+
+    // Copie les cookies éventuels posés par Supabase
+    res.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
+
+    return redirectRes;
   }
 
   return res;
 }
 
 export const config = {
-  matcher: [
-    /*
-      On applique partout sauf:
-      - assets Next
-      - favicon
-    */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
