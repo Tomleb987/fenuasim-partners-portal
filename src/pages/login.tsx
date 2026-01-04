@@ -1,75 +1,50 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'next/router';
+import { ShieldCheck, Wifi } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    
-    if (error) {
-      alert("Erreur d'authentification : " + error.message);
-    } else {
-      router.push('/');
-    }
-    setLoading(false);
+    if (error) alert(error.message);
+    else router.push('/');
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f8fafc] px-4 font-sans">
-      <div className="max-w-md w-full">
-        {/* Logo / Header Style Fenuasim */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-[#0f172a] tracking-tight">
-            FENUA<span className="text-[#ff6b6b]">SIM</span>
-          </h1>
-          <p className="text-gray-500 mt-2 font-medium">Espace Partenaires & Conseillers</p>
-        </div>
-
-        <div className="bg-white p-10 rounded-3xl shadow-xl shadow-blue-900/5 border border-gray-100">
-          <h2 className="text-xl font-bold text-[#0f172a] mb-6 text-center">Connexion</h2>
-          
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Email professionnel</label>
-              <input 
-                type="email" 
-                placeholder="nom@exemple.com" 
-                required
-                className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#ff6b6b]/20 focus:border-[#ff6b6b] outline-none transition-all"
-                onChange={(e) => setEmail(e.target.value)} 
-              />
+    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden font-sans">
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-3xl opacity-70"></div>
+      
+      <div className="relative z-10 w-full max-w-md px-6">
+        <div className="bg-white/80 backdrop-blur-2xl p-10 rounded-[2.5rem] shadow-2xl border border-white">
+          <div className="text-center mb-10">
+            <h1 className="text-4xl font-black text-gray-900">
+              FENUA<span className="text-orange-500">SIM</span>
+            </h1>
+            <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-bold uppercase tracking-widest">
+              <ShieldCheck className="w-3 h-3" /> Accès Partenaire
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Mot de passe</label>
-              <input 
-                type="password" 
-                placeholder="••••••••" 
-                required
-                className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#ff6b6b]/20 focus:border-[#ff6b6b] outline-none transition-all"
-                onChange={(e) => setPassword(e.target.value)} 
-              />
-            </div>
-
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full bg-[#ff6b6b] text-white py-4 rounded-2xl font-bold text-lg hover:bg-[#fa5252] shadow-lg shadow-red-200 transition-all active:scale-[0.98] disabled:opacity-70"
-            >
-              {loading ? 'Chargement...' : 'Se connecter'}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input 
+              type="email" placeholder="Email professionnel" required
+              className="w-full p-4 bg-white/50 border border-purple-100 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+              onChange={(e) => setEmail(e.target.value)} 
+            />
+            <input 
+              type="password" placeholder="Mot de passe" required
+              className="w-full p-4 bg-white/50 border border-purple-100 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+              onChange={(e) => setPassword(e.target.value)} 
+            />
+            <button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-purple-200 transition-all active:scale-95">
+              Se connecter
             </button>
           </form>
-
-          <p className="mt-8 text-center text-sm text-gray-400">
-            Accès réservé aux conseillers agréés Fenuasim.
-          </p>
         </div>
       </div>
     </div>
