@@ -12,20 +12,28 @@
     "next": "16.1.1",
     "react": "latest",
     "react-dom": "latest",
+
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
-    "lucide-react": "latest",
-    "tailwindcss": "latest",
-    "@tailwindcss/postcss": "latest",
+
     "stripe": "^16.0.0",
-    "nodemailer": "^6.9.14"
+
+    "nodemailer": "^6.9.14",
+    "resend": "^4.0.0",
+
+    "lucide-react": "latest",
+
+    "tailwindcss": "latest",
+    "@tailwindcss/postcss": "latest"
   },
   "devDependencies": {
     "typescript": "latest",
-    "@types/react": "latest",
+
     "@types/node": "latest",
+    "@types/react": "latest",
     "@types/react-dom": "latest",
     "@types/nodemailer": "^6.4.14",
+
     "postcss": "latest",
     "autoprefixer": "latest"
   }
