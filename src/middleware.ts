@@ -2,7 +2,9 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } })
+  let response = NextResponse.next({
+    request: { headers: request.headers },
+  })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,23 +13,33 @@ export async function middleware(request: NextRequest) {
       cookies: {
         get(name: string) { return request.cookies.get(name)?.value },
         set(name: string, value: string, options: CookieOptions) {
+          request.cookies.set({ name, value, ...options })
+          response = NextResponse.next({ request: { headers: request.headers } })
           response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: CookieOptions) {
+          request.cookies.set({ name, value: '', ...options })
+          response = NextResponse.next({ request: { headers: request.headers } })
           response.cookies.set({ name, value: '', ...options })
         },
       },
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  // Utiliser getUser() est plus sûr que getSession() pour le middleware
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // On laisse passer les images et la page login
-  const isPublicAsset = request.nextUrl.pathname.match(/\.(png|jpg|jpeg|gif|svg|ico)$/)
   const isLoginPage = request.nextUrl.pathname.startsWith('/login')
+  const isPublicAsset = request.nextUrl.pathname.match(/\.(png|jpg|jpeg|gif|svg|ico)$/)
 
-  if (!session && !isLoginPage && !isPublicAsset) {
+  // Redirection si non connecté
+  if (!user && !isLoginPage && !isPublicAsset) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Redirection vers l'accueil si déjà connecté sur la page login
+  if (user && isLoginPage) {
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   return response
