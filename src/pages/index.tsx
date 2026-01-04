@@ -1,69 +1,171 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'next/router';
-import { Smartphone, ShieldCheck, Wifi } from 'lucide-react';
+import { LogOut, TrendingUp, Tag, Calendar, User } from 'lucide-react';
+import Image from 'next/image';
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+export default function PartnerDashboard() {
+  const [sales, setSales] = useState<any[]>([]);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert("Erreur : " + error.message);
-    else router.push('/');
-    setLoading(false);
+  useEffect(() => {
+    const fetchStats = async () => {
+      // 1. Vérifier si l'utilisateur est connecté
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      // 2. Récupérer le profil du conseiller
+      const { data: prof } = await supabase
+        .from('partner_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      setProfile(prof);
+
+      // 3. Récupérer les ventes liées au code partenaire
+      if (prof?.partner_code) {
+        const { data: ord } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('partner_code', prof.partner_code)
+          .order('created_at', { ascending: false });
+        
+        setSales(ord || []);
+      }
+      setLoading(false);
+    };
+
+    fetchStats();
+  }, [router]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
   };
 
-  return (
-    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden font-sans">
-      {/* Éléments de design (Bulles de couleur comme sur l'accueil) */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-purple-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
 
-      <div className="relative z-10 max-w-md w-full px-4">
-        <div className="bg-white/80 backdrop-blur-xl p-10 rounded-[2rem] shadow-2xl border border-white/50">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-              FENUA<span className="text-orange-500">SIM</span>
-            </h1>
-            <p className="text-purple-700 text-sm font-bold mt-2 uppercase tracking-widest flex items-center justify-center gap-2">
-              <ShieldCheck className="w-4 h-4" /> Espace Partenaire
-            </p>
+  return (
+    <div className="min-h-screen bg-[#fafafa] font-sans pb-20">
+      {/* --- HEADER AVEC LOGO AGRANDI --- */}
+      <nav className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 py-6 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="relative h-16 w-40"> {/* Logo bien visible dans le header */}
+            <Image 
+              src="/logo-1.png" 
+              alt="Fenuasim Logo" 
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
+          
+          <button 
+            onClick={handleSignOut}
+            className="flex items-center gap-2 text-gray-400 font-bold hover:text-red-500 transition-all uppercase text-xs tracking-widest"
+          >
+            <LogOut className="w-4 h-4" /> 
+            <span className="hidden sm:inline">Déconnexion</span>
+          </button>
+        </div>
+      </nav>
+
+      <main className="max-w-6xl mx-auto px-6 mt-16">
+        {/* Section Bienvenue */}
+        <header className="mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-[10px] font-black uppercase tracking-widest mb-4">
+             <User className="w-3 h-3" /> Espace Conseiller
+          </div>
+          <h2 className="text-4xl font-extrabold text-gray-900 leading-tight">
+            Heureux de vous voir, <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-orange-500">
+              {profile?.advisor_name || 'Partenaire'}
+            </span>
+          </h2>
+        </header>
+        
+        {/* Grille de Statistiques */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+          {/* Carte Ventes (Style Fenuasim) */}
+          <div className="bg-gradient-to-br from-purple-600 to-purple-800 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-purple-200 relative overflow-hidden group">
+             <TrendingUp className="absolute right-[-10px] bottom-[-10px] w-32 h-32 opacity-10 group-hover:scale-110 transition-transform duration-500" />
+             <p className="text-purple-200 font-bold uppercase tracking-widest text-xs mb-2">Ventes réalisées</p>
+             <p className="text-6xl font-black">{sales.length}</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <input 
-                type="email" placeholder="Email professionnel" required
-                className="w-full p-4 bg-white border border-purple-100 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all shadow-sm"
-                onChange={(e) => setEmail(e.target.value)} 
-              />
-            </div>
-            <div>
-              <input 
-                type="password" placeholder="Mot de passe" required
-                className="w-full p-4 bg-white border border-purple-100 rounded-2xl focus:ring-2 focus:ring-purple-500 outline-none transition-all shadow-sm"
-                onChange={(e) => setPassword(e.target.value)} 
-              />
-            </div>
-            <button 
-              type="submit" disabled={loading}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-purple-200 transition-all active:scale-95"
-            >
-              {loading ? 'Connexion...' : 'Se connecter'}
-            </button>
-          </form>
-
-          <div className="mt-8 flex justify-center gap-6 text-purple-400">
-             <Wifi className="w-5 h-5" />
-             <Smartphone className="w-5 h-5" />
+          {/* Carte Code Promo */}
+          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-100 relative overflow-hidden group">
+             <Tag className="absolute right-[-10px] bottom-[-10px] w-32 h-32 text-orange-50 opacity-50 group-hover:scale-110 transition-transform duration-500" />
+             <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mb-2">Votre Code Partenaire</p>
+             <p className="text-6xl font-black text-orange-500">{profile?.partner_code || '---'}</p>
           </div>
         </div>
-      </div>
+
+        {/* Historique des Ventes */}
+        <div className="bg-white rounded-[2.5rem] shadow-xl shadow-gray-100 border border-gray-100 overflow-hidden">
+          <div className="p-8 border-b border-gray-50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Calendar className="w-6 h-6 text-purple-600" />
+              <h3 className="text-xl font-bold text-gray-900">Historique des commandes</h3>
+            </div>
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">
+              Derniers 30 jours
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50/50">
+                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">Date</th>
+                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">Référence</th>
+                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">Montant</th>
+                  <th className="p-6 text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em] text-right">Statut</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {sales.length > 0 ? sales.map((order) => (
+                  <tr key={order.id} className="hover:bg-purple-50/30 transition-colors">
+                    <td className="p-6 text-gray-600 font-medium text-sm">
+                      {new Date(order.created_at).toLocaleDateString('fr-FR')}
+                    </td>
+                    <td className="p-6 text-gray-400 font-mono text-xs italic">
+                      #{order.id.slice(0, 8)}
+                    </td>
+                    <td className="p-6 text-gray-900 font-black text-lg">
+                      {order.total_amount} €
+                    </td>
+                    <td className="p-6 text-right">
+                      <span className="px-4 py-1.5 rounded-full text-[10px] font-black bg-green-100 text-green-700 uppercase tracking-widest">
+                        {order.status || 'Validé'}
+                      </span>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan={4} className="p-20 text-center text-gray-300 font-medium">
+                      Aucune vente enregistrée pour le moment.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
