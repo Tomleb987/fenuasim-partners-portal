@@ -13,8 +13,8 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // TEST DE SURVIE : Si vous voyez cette alerte, le bouton fonctionne !
-    alert("Tentative de connexion pour : " + email);
+    // TEST DE SURVIE : Cette alerte DOIT s'afficher au clic
+    window.alert("Tentative de connexion en cours pour : " + email);
     
     setLoading(true);
     try {
@@ -24,12 +24,13 @@ export default function LoginPage() {
       });
       
       if (error) {
-        alert("Erreur Supabase : " + error.message);
+        window.alert("Erreur Supabase : " + error.message);
       } else if (data.session) {
+        window.alert("Connexion réussie ! Redirection...");
         router.push('/');
       }
     } catch (err) {
-      alert("Erreur système : " + err);
+      window.alert("Erreur système : " + err);
     } finally {
       setLoading(false);
     }
@@ -49,6 +50,7 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* LE FORMULAIRE DOIT AVOIR onSubmit */}
           <form onSubmit={handleLogin} className="space-y-4 text-left">
             <div>
               <input 
@@ -68,10 +70,11 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)} 
               />
             </div>
+            {/* LE BOUTON DOIT ÊTRE type="submit" */}
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg shadow-purple-200 transition-all active:scale-95 disabled:opacity-50"
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95 disabled:opacity-50"
             >
               {loading ? 'Connexion...' : 'Se connecter'}
             </button>
