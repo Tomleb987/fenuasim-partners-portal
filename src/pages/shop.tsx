@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/router"
 import { supabaseBrowser } from "@/lib/supabase/browser"
 
-import PackageCard from "../components/shop/PackageCard"
+import PackageCard from "@/components/shop/PackageCard";
 
 type AiraloPackage = {
   id: string
