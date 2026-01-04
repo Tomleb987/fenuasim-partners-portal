@@ -1,28 +1,8 @@
-{
-  "name": "fenuasim-partners-portal",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "@supabase/auth-helpers-nextjs": "latest",
-    "@supabase/supabase-js": "latest",
-    "lucide-react": "latest"
-  },
-  "devDependencies": {
-    "typescript": "latest",
-    "@types/react": "latest",
-    "@types/node": "latest",
-    "@types/react-dom": "latest",
-    "autoprefixer": "latest",
-    "postcss": "latest",
-    "tailwindcss": "latest"
-  }
+"dependencies": {
+  "next": "latest",
+  "react": "latest",
+  "react-dom": "latest",
+  "@supabase/ssr": "latest",
+  "@supabase/supabase-js": "latest",
+  "lucide-react": "latest"
 }
