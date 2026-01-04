@@ -1,52 +1,98 @@
-import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import { ShieldCheck } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/router"
+import { supabaseBrowser } from "@/lib/supabase/browser"
 
-export default function PartnerShop() {
-  const [packages, setPackages] = useState<any[]>([])
+export default function Shop() {
+  const supabase = useMemo(() => supabaseBrowser(), [])
+  const router = useRouter()
+
   const [partner, setPartner] = useState<any>(null)
+  const [packages, setPackages] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true
+
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      const { data: prof } = await supabase.from('partner_profiles').select('*').eq('id', session.user?.id).single()
+      setLoading(true)
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      // ✅ GARDE OBLIGATOIRE
+      if (!session) {
+        router.replace("/login")
+        return
+      }
+
+      // 1) Profil partenaire
+      const { data: prof, error: profErr } = await supabase
+        .from("partner_profiles")
+        .select("*")
+        .eq("id", session.user.id)
+        .single()
+
+      if (!mounted) return
+
+      if (profErr || !prof) {
+        setPartner(null)
+        setPackages([])
+        setLoading(false)
+        return
+      }
+
       setPartner(prof)
 
-      const { data: pkg } = await supabase.from('airalo_packages').select('*').limit(20)
-      setPackages(pkg || [])
-    }
-    init()
-  }, [])
+      // 2) Packages Airalo
+      const { data: pkg } = await supabase
+        .from("airalo_packages")
+        .select("*")
+        .limit(20)
 
-  const startCheckout = async (p: any) => {
-    const res = await fetch('/api/stripe/create-checkout-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        packageId: p.id,
-        price: p.final_price_eur,
-        name: p.name,
-        partnerCode: partner.partner_code 
-      })
-    })
-    const { url } = await res.json()
-    window.location.href = url
+      if (!mounted) return
+
+      setPackages(pkg || [])
+      setLoading(false)
+    }
+
+    init()
+
+    return () => {
+      mounted = false
+    }
+  }, [supabase, router])
+
+  if (loading) {
+    return <div className="p-10 text-center">Chargement…</div>
+  }
+
+  if (!partner) {
+    return (
+      <div className="p-10 text-center text-gray-500">
+        Aucun profil partenaire trouvé.
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-purple-900 text-white p-3 text-center text-xs font-bold uppercase tracking-tighter">
-        <ShieldCheck className="inline mr-2" size={14} /> Boutique Partenaire Active : {partner?.partner_code}
-      </div>
-      <div className="max-w-7xl mx-auto p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-        {packages.map(p => (
-          <div key={p.id} className="bg-white p-6 rounded-3xl shadow-sm border">
-            <h3 className="font-bold text-xl">{p.name}</h3>
-            <p className="text-3xl font-black mt-4">{p.final_price_eur}€</p>
-            <button onClick={() => startCheckout(p)} className="w-full mt-6 bg-purple-600 text-white py-3 rounded-xl font-bold">Acheter</button>
-          </div>
+    <div className="p-10">
+      <h1 className="text-2xl font-bold mb-6">
+        Boutique partenaire — {partner.partner_code}
+      </h1>
+
+      <ul className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {packages.map((p) => (
+          <li
+            key={p.id}
+            className="border rounded-xl p-6 hover:shadow-lg transition"
+          >
+            <h2 className="font-bold">{p.name}</h2>
+            <p className="text-sm text-gray-500">{p.description}</p>
+            <p className="mt-4 font-black text-lg">{p.price} €</p>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   )
 }
