@@ -23,17 +23,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden font-sans">
-      {/* Éléments de design en arrière-plan (bulles de couleur) */}
+    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden font-sans text-gray-900">
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
 
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="bg-white/80 backdrop-blur-2xl p-10 rounded-[2.5rem] shadow-2xl border border-white">
           <div className="text-center mb-10">
-            {/* Utilisation de logo 1.PNG situé dans le dossier public */}
+            {/* Correction du lien de l'image : l'espace est remplacé par %20 */}
             <img 
-              src="/logo 1.PNG" 
+              src="/logo%201.PNG" 
               alt="Fenuasim Logo" 
               className="h-20 w-auto mx-auto mb-6" 
             />
