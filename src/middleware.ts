@@ -1,55 +1,42 @@
-import { createServerClient, type CookieOptions } from "@supabase/ssr"
-import { NextResponse, type NextRequest } from "next/server"
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
 
-const PUBLIC_ROUTES = ["/login", "/auth/callback"]
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next();
+  const supabase = createMiddlewareClient({ req, res });
 
-export async function middleware(request: NextRequest) {
-  const response = NextResponse.next()
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: "", ...options })
-        },
-      },
-    }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const pathname = request.nextUrl.pathname
-  const isPublicRoute = PUBLIC_ROUTES.some((p) => pathname.startsWith(p))
-  const isStatic =
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon.ico") ||
-    pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|webp|css|js|map)$/)
-
-  if (isStatic) return response
-
-  if (!user && !isPublicRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/login"
-    return NextResponse.redirect(url)
+  // IMPORTANT: on laisse Stripe webhook tranquille
+  if (req.nextUrl.pathname.startsWith("/api/stripe/webhook")) {
+    return res;
   }
 
-  if (user && pathname === "/login") {
-    const url = request.nextUrl.clone()
-    url.pathname = "/"
-    return NextResponse.redirect(url)
+  // Routes publiques
+  const publicPaths = ["/login", "/"];
+  const isPublic = publicPaths.includes(req.nextUrl.pathname);
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  // Si pas connecté et route non publique => redirect login
+  if (!session && !isPublic && !req.nextUrl.pathname.startsWith("/api")) {
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.pathname = "/login";
+    redirectUrl.searchParams.set("redirect", req.nextUrl.pathname);
+    return NextResponse.redirect(redirectUrl);
   }
 
-  return response
+  return res;
 }
 
 export const config = {
-  matcher: ["/((?!api).*)"],
-}
+  matcher: [
+    /*
+      On applique partout sauf:
+      - assets Next
+      - favicon
+    */
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
+};
