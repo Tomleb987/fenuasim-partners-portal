@@ -1,282 +1,71 @@
-// src/pages/shop.tsx
-import { useEffect, useMemo, useState } from "react"
-import Head from "next/head"
-import Image from "next/image"
-import { useRouter } from "next/router"
-import { supabaseBrowser } from "@/lib/supabase-browser"
+"use client";
 
-type Product = {
-  id: string
-  country_name?: string | null
-  title?: string | null
-  name?: string | null
-  data_gb?: number | null
-  duration_days?: number | null
-  final_price_eur?: number | null
-}
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import { supabase } from "@/lib/supabaseClient";
+import Image from "next/image";
+import { Star, ShieldCheck, ShoppingBag } from "lucide-react";
 
-export default function PartnerShopPage() {
-  const supabase = useMemo(() => supabaseBrowser(), [])
-  const router = useRouter()
+// On réutilise la logique de traduction de votre site public
+const REGION_TRANSLATIONS: Record<string, string> = { "United States": "États-Unis", "France": "France", "Japan": "Japon" /* ... ajoutez les autres */ };
 
-  const [loading, setLoading] = useState(true)
-  const [payingId, setPayingId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const [partnerCode, setPartnerCode] = useState<string | null>(null)
-  const [advisorName, setAdvisorName] = useState<string | null>(null)
-  const [products, setProducts] = useState<Product[]>([])
+export default function PartnerShop() {
+  const router = useRouter();
+  const [partner, setPartner] = useState<any>(null);
+  const [packages, setPackages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currency, setCurrency] = useState<"EUR" | "XPF" | "USD">("EUR");
 
   useEffect(() => {
-    let mounted = true
+    const initShop = async () => {
+      // 1. Vérification forcée du partenaire
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return router.push('/login');
 
-    const init = async () => {
-      setLoading(true)
-      setError(null)
-
-      const { data: sessionData } = await supabase.auth.getSession()
-      const user = sessionData.session?.user
-      if (!user) {
-        window.location.href = "/login"
-        return
+      const { data: profile } = await supabase.from('partner_profiles').select('*').eq('id', session.user.id).single();
+      if (!profile || profile.status !== 'active') {
+        alert("Profil inactif. Contactez l'administrateur.");
+        return router.push('/');
       }
+      setPartner(profile);
 
-      // Profil partenaire
-      const { data: prof, error: profErr } = await supabase
-        .from("partner_profiles")
-        .select("partner_code, advisor_name")
-        .eq("id", user.id)
-        .single()
+      // 2. Chargement des forfaits
+      const { data: pkgData } = await supabase.from("airalo_packages").select("*").order("final_price_eur", { ascending: true });
+      setPackages(pkgData || []);
+      setLoading(false);
+    };
+    initShop();
+  }, [router]);
 
-      if (profErr || !prof?.partner_code) {
-        if (mounted) {
-          setPartnerCode(null)
-          setAdvisorName(null)
-          setProducts([])
-          setError("Votre code partenaire est introuvable. Contactez l’équipe FENUA SIM.")
-          setLoading(false)
-        }
-        return
-      }
-
-      if (!mounted) return
-      setPartnerCode(prof.partner_code)
-      setAdvisorName(prof.advisor_name ?? null)
-
-      // ✅ Produits Airalo : final_price_eur
-      const { data: packs, error: packsErr } = await supabase
-        .from("airalo_packages")
-        .select("id, country_name, title, name, data_gb, duration_days, final_price_eur")
-        .order("final_price_eur", { ascending: true })
-
-      if (packsErr) {
-        if (mounted) {
-          setProducts([])
-          setError("Impossible de charger les offres. Réessayez dans quelques instants.")
-          setLoading(false)
-        }
-        return
-      }
-
-      if (!mounted) return
-      setProducts((packs as Product[]) || [])
-      setLoading(false)
-    }
-
-    init()
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-      if (!session) window.location.href = "/login"
-    })
-
-    return () => {
-      mounted = false
-      sub.subscription.unsubscribe()
-    }
-  }, [supabase])
-
-  const signOut = async () => {
-    await supabase.auth.signOut()
-    window.location.href = "/login"
-  }
-
-  const startCheckout = async (product: Product) => {
-    setError(null)
-    setPayingId(product.id)
-
-    try {
-      const price = typeof product.final_price_eur === "number" ? product.final_price_eur : null
-      if (!price) throw new Error("Prix produit introuvable (final_price_eur).")
-
-      const name =
-        product.title ||
-        product.name ||
-        product.country_name ||
-        "Forfait eSIM"
-
-      const cartItems = [
-        { name, price, quantity: 1, product_id: product.id },
-      ]
-
-      const r = await fetch("/api/stripe/create-checkout-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cartItems, customer_email: null }),
+  const handleCheckout = async (pkg: any) => {
+    // Appel à votre API de session Stripe partenaire
+    const res = await fetch('/api/stripe/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        cartItems: [{ ...pkg, partner_code: partner.partner_code }], 
+        customer_email: partner.email 
       })
+    });
+    const { sessionId } = await res.json();
+    // Redirection Stripe...
+  };
 
-      const json = await r.json()
-      if (!r.ok) throw new Error(json?.error || "Erreur création paiement.")
-
-      if (json?.url) {
-        window.location.href = json.url
-        return
-      }
-
-      throw new Error("URL Stripe manquante (checkoutSession.url).")
-    } catch (e: any) {
-      setError(e?.message ?? "Erreur inconnue.")
-      setPayingId(null)
-    }
-  }
+  if (loading) return <div className="p-20 text-center font-black">Chargement de votre shop partenaire...</div>;
 
   return (
-    <>
-      <Head>
-        <title>Boutique Partenaire — FENUA SIM</title>
-        <meta name="robots" content="noindex,nofollow" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </Head>
-
-      <div className="min-h-screen bg-[#fafafa] font-sans">
-        {/* HEADER */}
-        <nav className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 py-6 sticky top-0 z-50 shadow-sm">
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <div className="flex items-center gap-6">
-              <div className="relative h-12 w-32">
-                <Image
-                  src="/logo-1.png"
-                  alt="Fenuasim Logo"
-                  fill
-                  className="object-contain"
-                  priority
-                />
-              </div>
-
-              {partnerCode && (
-                <div className="hidden sm:flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                    Code Partenaire
-                  </span>
-                  <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-orange-100 text-orange-600">
-                    {partnerCode}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => router.push("/")}
-                className="rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest
-                           text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition"
-              >
-                Dashboard
-              </button>
-              <button
-                onClick={signOut}
-                className="rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest
-                           text-white bg-gradient-to-r from-orange-500 via-fuchsia-500 to-violet-600
-                           hover:brightness-110 transition"
-              >
-                Déconnexion
-              </button>
-            </div>
-          </div>
-        </nav>
-
-        <main className="max-w-7xl mx-auto px-6 py-12">
-          <header className="mb-10">
-            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight">
-              Boutique Partenaire
-              {advisorName ? (
-                <>
-                  <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-orange-500">
-                    {advisorName}
-                  </span>
-                </>
-              ) : null}
-            </h1>
-            <p className="text-gray-500 mt-3 max-w-2xl">
-              Les ventes réalisées ici sont automatiquement attribuées à votre code partenaire.
-            </p>
-          </header>
-
-          {error && (
-            <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="min-h-[50vh] flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" />
-            </div>
-          ) : products.length === 0 ? (
-            <div className="rounded-3xl bg-white border border-gray-100 shadow-sm p-10 text-center text-gray-500">
-              Aucune offre disponible pour le moment.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {products.map((p) => {
-                const price = typeof p.final_price_eur === "number" ? p.final_price_eur : null
-                const title = p.title || p.name || p.country_name || "Forfait eSIM"
-
-                return (
-                  <div
-                    key={p.id}
-                    className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 hover:shadow-md transition"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-gray-900 font-extrabold text-lg">{title}</p>
-                        <p className="text-gray-400 text-sm mt-1">
-                          {p.data_gb ? `${p.data_gb} Go` : "Data"}
-                          {p.duration_days ? ` • ${p.duration_days} jours` : ""}
-                        </p>
-                      </div>
-
-                      <div className="text-right">
-                        <p className="text-gray-900 font-black text-xl">
-                          {price !== null ? `${price.toFixed(2)} €` : "—"}
-                        </p>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                          Paiement sécurisé
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      disabled={payingId === p.id || price === null}
-                      onClick={() => startCheckout(p)}
-                      className="mt-6 w-full rounded-2xl px-5 py-3 text-sm font-black uppercase tracking-widest
-                                 text-white disabled:opacity-60
-                                 bg-gradient-to-r from-orange-500 via-fuchsia-500 to-violet-600
-                                 hover:brightness-110 transition"
-                    >
-                      {payingId === p.id ? "Redirection…" : "Acheter"}
-                    </button>
-
-                    <p className="mt-3 text-xs text-gray-400">
-                      Attribution : <span className="font-mono">{partnerCode}</span>
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </main>
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-purple-900 text-white py-3 px-6 flex justify-between items-center text-[10px] font-black uppercase tracking-widest sticky top-0 z-50">
+        <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-orange-400" /> Boutique Officielle : {partner.advisor_name}</span>
+        <span className="bg-white/10 px-3 py-1 rounded">VOTRE CODE : {partner.partner_code}</span>
       </div>
-    </>
-  )
+      
+      <main className="max-w-7xl mx-auto p-8">
+        <h1 className="text-4xl font-black mb-12">Sélectionnez une destination</h1>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          {/* Affichez ici vos composants DestinationCard ou PackageCard */}
+        </div>
+      </main>
+    </div>
+  );
 }
