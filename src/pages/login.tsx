@@ -1,86 +1,125 @@
-import { useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { useRouter } from 'next/router';
-import { ShieldCheck } from 'lucide-react';
-import Image from 'next/image';
+// src/pages/login.tsx
+import { useEffect, useState } from "react"
+import Head from "next/head"
+import { useRouter } from "next/router"
+import { supabaseBrowser } from "@/lib/supabase-browser"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const router = useRouter()
+  const supabase = supabaseBrowser()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // TEST DE SURVIE : Cette alerte DOIT s'afficher au clic
-    window.alert("Tentative de connexion en cours pour : " + email);
-    
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: email.trim(), 
-        password: password 
-      });
-      
-      if (error) {
-        window.alert("Erreur Supabase : " + error.message);
-      } else if (data.session) {
-        window.alert("Connexion réussie ! Redirection...");
-        router.push('/');
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  // Si déjà connecté, on sort de /login
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      const { data } = await supabase.auth.getSession()
+      if (!mounted) return
+      if (data.session) {
+        // hard redirect pour être cohérent avec le middleware
+        window.location.href = "/"
       }
-    } catch (err) {
-      window.alert("Erreur système : " + err);
-    } finally {
-      setLoading(false);
+    })()
+    return () => {
+      mounted = false
     }
-  };
+  }, [supabase])
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setErrorMsg(null)
+    setLoading(true)
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
+
+      if (error) {
+        setErrorMsg(error.message)
+        return
+      }
+
+      // IMPORTANT : hard navigation pour que le middleware relise les cookies
+      window.location.href = "/"
+    } catch (err: any) {
+      setErrorMsg(err?.message ?? "Erreur inconnue.")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 font-sans text-gray-900">
-      <div className="relative z-10 w-full max-w-md px-6">
-        <div className="bg-white/80 backdrop-blur-2xl p-10 rounded-[2.5rem] shadow-2xl border border-white text-center">
-          
-          <div className="mb-10 flex flex-col items-center">
-            <div className="relative h-40 w-full mb-6">
-              <Image src="/logo-1.png" alt="Logo" fill className="object-contain" priority />
-            </div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-bold uppercase tracking-widest">
-              <ShieldCheck className="w-3 h-3" /> Accès Partenaire
-            </div>
+    <>
+      <Head>
+        <title>Partenaires — Connexion</title>
+        <meta name="robots" content="noindex,nofollow" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </Head>
+
+      <main className="min-h-screen flex items-center justify-center bg-neutral-950 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-neutral-900/60 border border-neutral-800 p-6 shadow-xl">
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold text-white">Espace Partenaires</h1>
+            <p className="text-sm text-neutral-300 mt-1">
+              Connectez-vous pour accéder à votre tableau de bord.
+            </p>
           </div>
 
-          {/* LE FORMULAIRE DOIT AVOIR onSubmit */}
-          <form onSubmit={handleLogin} className="space-y-4 text-left">
+          {errorMsg && (
+            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              {errorMsg}
+            </div>
+          )}
+
+          <form onSubmit={onSubmit} className="space-y-4">
             <div>
-              <input 
-                type="email" 
-                placeholder="Email professionnel" 
+              <label className="block text-sm text-neutral-200 mb-1">Email</label>
+              <input
+                type="email"
+                autoComplete="email"
                 required
-                className="w-full p-4 bg-white/50 border border-purple-100 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                onChange={(e) => setEmail(e.target.value)} 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-2 text-white outline-none focus:border-neutral-600"
+                placeholder="nom@domaine.com"
               />
             </div>
+
             <div>
-              <input 
-                type="password" 
-                placeholder="Mot de passe" 
+              <label className="block text-sm text-neutral-200 mb-1">Mot de passe</label>
+              <input
+                type="password"
+                autoComplete="current-password"
                 required
-                className="w-full p-4 bg-white/50 border border-purple-100 rounded-2xl outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                onChange={(e) => setPassword(e.target.value)} 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-2 text-white outline-none focus:border-neutral-600"
+                placeholder="••••••••"
               />
             </div>
-            {/* LE BOUTON DOIT ÊTRE type="submit" */}
-            <button 
-              type="submit" 
+
+            <button
+              type="submit"
               disabled={loading}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-bold text-lg shadow-lg transition-all active:scale-95 disabled:opacity-50"
+              className="w-full rounded-xl px-4 py-2 text-sm font-medium text-white disabled:opacity-60
+                         bg-gradient-to-r from-orange-500 via-fuchsia-500 to-violet-600
+                         hover:brightness-110 transition"
             >
-              {loading ? 'Connexion...' : 'Se connecter'}
+              {loading ? "Connexion…" : "Se connecter"}
             </button>
+
+            <div className="text-xs text-neutral-400 pt-2">
+              Problème d’accès ? Contactez le support FENUA SIM.
+            </div>
           </form>
         </div>
-      </div>
-    </div>
-  );
+      </main>
+    </>
+  )
 }
