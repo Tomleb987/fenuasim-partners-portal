@@ -1,88 +1,159 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from "@/lib/supabaseClient";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { supabaseServerFromApi } from "@/lib/supabase/server";
+
+function setCors(res: NextApiResponse) {
+  // Si ton front appelle depuis le même domaine, tu peux supprimer CORS entièrement.
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  setCors(res);
+
+  // Preflight
+  if (req.method === "OPTIONS") return res.status(204).end();
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-    const { packageId, customerEmail, airalo_id, customerName, customerFirstname, quantity, description } = req.body;
+    // 1) Auth obligatoire (session via cookies)
+    const supabase = supabaseServerFromApi(req, res);
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-
-    const AIRALO_API_URL = process.env.AIRALO_API_URL;
-    const tokenResponse = await fetch(`${AIRALO_API_URL}/token`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        client_id: process.env.AIRALO_CLIENT_ID ?? '',
-        client_secret: process.env.AIRALO_CLIENT_SECRET ?? '',
-        grant_type: 'client_credentials'
-      })
-    });
-
-    if (!tokenResponse.ok) {
-      const tokenError = await tokenResponse.text();
-      throw new Error(`Failed to get Airalo access token: ${tokenError}`);
+    if (sessionError) {
+      return res.status(401).json({ error: "Invalid session" });
+    }
+    if (!session) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const tokenData = await tokenResponse.json();
-    const accessToken = tokenData.data.access_token;
+    // 2) (Recommandé) Vérifier que l'utilisateur est bien un "partner user"
+    // Adapte le nom de table/champs à ton schéma réel.
+    // Si tu n’as pas encore partner_users, commente ce bloc.
+    /*
+    const { data: partnerUser, error: partnerErr } = await supabase
+      .from("partner_users")
+      .select("partner_id, role")
+      .eq("user_id", session.user.id)
+      .single();
 
+    if (partnerErr || !partnerUser) {
+      return res.status(403).json({ error: "Forbidden (not a partner user)" });
+    }
+    */
+
+    // 3) Validation inputs (minimum)
+    const {
+      packageId,
+      customerEmail,
+      airalo_id,
+      customerName,
+      customerFirstname,
+      quantity,
+      description,
+    } = req.body ?? {};
+
+    if (!customerEmail || !airalo_id) {
+      return res.status(400).json({ error: "Missing required fields: customerEmail, airalo_id" });
+    }
+
+    const AIRALO_API_URL = process.env.AIRALO_API_URL;
+    const AIRALO_CLIENT_ID = process.env.AIRALO_CLIENT_ID;
+    const AIRALO_CLIENT_SECRET = process.env.AIRALO_CLIENT_SECRET;
+
+    if (!AIRALO_API_URL || !AIRALO_CLIENT_ID || !AIRALO_CLIENT_SECRET) {
+      return res.status(500).json({ error: "Airalo env vars are missing on server" });
+    }
+
+    // 4) Token Airalo
+    const tokenResponse = await fetch(`${AIRALO_API_URL}/token`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        client_id: AIRALO_CLIENT_ID,
+        client_secret: AIRALO_CLIENT_SECRET,
+        grant_type: "client_credentials",
+      }),
+    });
+
+    const tokenText = await tokenResponse.text();
+    if (!tokenResponse.ok) {
+      throw new Error(`Failed to get Airalo access token: ${tokenText}`);
+    }
+
+    const tokenData = JSON.parse(tokenText);
+    const accessToken = tokenData?.data?.access_token;
+    if (!accessToken) {
+      throw new Error("Airalo token response missing access_token");
+    }
+
+    // 5) Create order Airalo
     const orderBody = {
       package_id: airalo_id,
-      quantity: quantity || 1,
-      type: 'sim',
-      brand_settings_name: '',
-      description: description
+      quantity: Number(quantity) > 0 ? Number(quantity) : 1,
+      type: "sim",
+      brand_settings_name: "",
+      description: description ?? "",
     };
 
     const orderResponse = await fetch(`${AIRALO_API_URL}/orders`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify(orderBody)
+      body: JSON.stringify(orderBody),
     });
-    console.log("Airalo order response here: ", orderResponse);
 
-    const orderText = await orderResponse.clone().text();
+    const orderText = await orderResponse.text();
     if (!orderResponse.ok) {
       throw new Error(`Airalo API error: ${orderText}`);
     }
+
     const orderData = JSON.parse(orderText);
+    const sim = orderData?.data?.sims?.[0];
 
-    const sim = orderData.data.sims?.[0];
-    const { data: order, error } = await supabase.from('airalo_orders').insert({
-      order_id: orderData.data.id.toString(),
-      email: customerEmail,
-      package_id: packageId,
-      sim_iccid: sim?.iccid || null,
-      qr_code_url: sim?.qrcode_url || null,
-      apple_installation_url: sim?.direct_apple_installation_url || null,
-      status: orderData.meta?.message || "success",
-      data_balance: orderData.data.data || null,
-      created_at: new Date().toISOString(),
-      nom: customerName,
-      prenom: customerFirstname
-    }).select().single();
+    // 6) Insert Supabase (avec client server => RLS + session)
+    // Ajoute partner_id si tu as la table/colonne (recommandé).
+    const { data: order, error: dbError } = await supabase
+      .from("airalo_orders")
+      .insert({
+        // partner_id: partnerUser.partner_id, // si tu actives le bloc partner_users
+        created_by: session.user.id, // (recommandé) ajoute ce champ dans la table si possible
+        order_id: String(orderData?.data?.id ?? ""),
+        email: customerEmail,
+        package_id: packageId ?? null,
+        sim_iccid: sim?.iccid ?? null,
+        qr_code_url: sim?.qrcode_url ?? null,
+        apple_installation_url: sim?.direct_apple_installation_url ?? null,
+        status: orderData?.meta?.message ?? "success",
+        data_balance: orderData?.data?.data ?? null,
+        created_at: new Date().toISOString(),
+        nom: customerName ?? null,
+        prenom: customerFirstname ?? null,
+      })
+      .select()
+      .single();
 
-    if (error) throw error;
+    if (dbError) throw dbError;
 
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Type', 'application/json');
+    res.setHeader("Content-Type", "application/json");
     return res.status(200).json({ order });
   } catch (error: any) {
-    console.error('Erreur API:', error);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Content-Type', 'application/json');
+    console.error("Erreur API:", error);
+    res.setHeader("Content-Type", "application/json");
     return res.status(400).json({
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 }
