@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseServerFromApi } from "@/lib/supabase/server";
 
 function setCors(res: NextApiResponse) {
-  // Si ton front appelle depuis le même domaine, tu peux supprimer CORS entièrement.
+  // Si ton front appelle depuis le même domaine, tu peux enlever CORS.
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -11,7 +11,7 @@ function setCors(res: NextApiResponse) {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   setCors(res);
 
-  // Preflight
+  // Preflight CORS
   if (req.method === "OPTIONS") return res.status(204).end();
 
   if (req.method !== "POST") {
@@ -33,22 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // 2) (Recommandé) Vérifier que l'utilisateur est bien un "partner user"
-    // Adapte le nom de table/champs à ton schéma réel.
-    // Si tu n’as pas encore partner_users, commente ce bloc.
-    /*
-    const { data: partnerUser, error: partnerErr } = await supabase
-      .from("partner_users")
-      .select("partner_id, role")
-      .eq("user_id", session.user.id)
-      .single();
-
-    if (partnerErr || !partnerUser) {
-      return res.status(403).json({ error: "Forbidden (not a partner user)" });
-    }
-    */
-
-    // 3) Validation inputs (minimum)
+    // 2) Lecture + validation minimale des inputs
     const {
       packageId,
       customerEmail,
@@ -60,7 +45,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } = req.body ?? {};
 
     if (!customerEmail || !airalo_id) {
-      return res.status(400).json({ error: "Missing required fields: customerEmail, airalo_id" });
+      return res
+        .status(400)
+        .json({ error: "Missing required fields: customerEmail, airalo_id" });
     }
 
     const AIRALO_API_URL = process.env.AIRALO_API_URL;
@@ -71,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: "Airalo env vars are missing on server" });
     }
 
-    // 4) Token Airalo
+    // 3) Récupérer le token Airalo
     const tokenResponse = await fetch(`${AIRALO_API_URL}/token`, {
       method: "POST",
       headers: {
@@ -91,12 +78,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const tokenData = JSON.parse(tokenText);
-    const accessToken = tokenData?.data?.access_token;
+    const accessToken: string | undefined = tokenData?.data?.access_token;
+
     if (!accessToken) {
       throw new Error("Airalo token response missing access_token");
     }
 
-    // 5) Create order Airalo
+    // 4) Créer la commande Airalo
     const orderBody = {
       package_id: airalo_id,
       quantity: Number(quantity) > 0 ? Number(quantity) : 1,
@@ -123,21 +111,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const orderData = JSON.parse(orderText);
     const sim = orderData?.data?.sims?.[0];
 
-    // 6) Insert Supabase (avec client server => RLS + session)
-    // Ajoute partner_id si tu as la table/colonne (recommandé).
+    // 5) Enregistrer en base (via client server => session/cookies)
+    // IMPORTANT: si ta table a du RLS strict, il faudra une policy qui autorise l'insert
+    // ou utiliser un service role pour l'insert.
     const { data: order, error: dbError } = await supabase
       .from("airalo_orders")
       .insert({
-        // partner_id: partnerUser.partner_id, // si tu actives le bloc partner_users
-        created_by: session.user.id, // (recommandé) ajoute ce champ dans la table si possible
+        // Recommandé si tu peux ajouter la colonne :
+        // created_by: session.user.id,
+
         order_id: String(orderData?.data?.id ?? ""),
         email: customerEmail,
         package_id: packageId ?? null,
+
         sim_iccid: sim?.iccid ?? null,
         qr_code_url: sim?.qrcode_url ?? null,
         apple_installation_url: sim?.direct_apple_installation_url ?? null,
+
         status: orderData?.meta?.message ?? "success",
         data_balance: orderData?.data?.data ?? null,
+
         created_at: new Date().toISOString(),
         nom: customerName ?? null,
         prenom: customerFirstname ?? null,
