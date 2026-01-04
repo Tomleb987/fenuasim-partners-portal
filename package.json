@@ -17,13 +17,15 @@
     "lucide-react": "latest",
     "tailwindcss": "latest",
     "@tailwindcss/postcss": "latest",
-    "stripe": "^16.0.0"
+    "stripe": "^16.0.0",
+    "nodemailer": "^6.9.14"
   },
   "devDependencies": {
     "typescript": "latest",
     "@types/react": "latest",
     "@types/node": "latest",
     "@types/react-dom": "latest",
+    "@types/nodemailer": "^6.4.14",
     "postcss": "latest",
     "autoprefixer": "latest"
   }
