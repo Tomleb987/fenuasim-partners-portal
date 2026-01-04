@@ -2,97 +2,113 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/router"
 import { supabaseBrowser } from "@/lib/supabase/browser"
 
+import PackageCard from "@/components/shop/PackageCard"
+
+type AiraloPackage = {
+  id: string
+  country: string
+  region?: string | null
+  name: string
+  data: string
+  validity: string
+  final_price_eur: number
+}
+
 export default function Shop() {
   const supabase = useMemo(() => supabaseBrowser(), [])
   const router = useRouter()
 
-  const [partner, setPartner] = useState<any>(null)
-  const [packages, setPackages] = useState<any[]>([])
+  const [packages, setPackages] = useState<AiraloPackage[]>([])
+  const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let mounted = true
-
-    const init = async () => {
-      setLoading(true)
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      // ✅ GARDE OBLIGATOIRE
-      if (!session) {
-        router.replace("/login")
-        return
-      }
-
-      // 1) Profil partenaire
-      const { data: prof, error: profErr } = await supabase
-        .from("partner_profiles")
-        .select("*")
-        .eq("id", session.user.id)
-        .single()
-
-      if (!mounted) return
-
-      if (profErr || !prof) {
-        setPartner(null)
-        setPackages([])
-        setLoading(false)
-        return
-      }
-
-      setPartner(prof)
-
-      // 2) Packages Airalo
-      const { data: pkg } = await supabase
+    const load = async () => {
+      const { data, error } = await supabase
         .from("airalo_packages")
         .select("*")
-        .limit(20)
+        .order("country")
 
-      if (!mounted) return
+      if (!error && data) {
+        setPackages(data as AiraloPackage[])
+      }
 
-      setPackages(pkg || [])
       setLoading(false)
     }
 
-    init()
+    load()
+  }, [supabase])
 
-    return () => {
-      mounted = false
-    }
-  }, [supabase, router])
+  /** 🔍 Filtrage par pays / destination */
+  const filteredPackages = useMemo(() => {
+    if (!search) return packages
+
+    const q = search.toLowerCase()
+    return packages.filter(
+      (p) =>
+        p.country.toLowerCase().includes(q) ||
+        p.name.toLowerCase().includes(q)
+    )
+  }, [packages, search])
+
+  /** 🌍 Groupement par pays */
+  const packagesByCountry = useMemo(() => {
+    return filteredPackages.reduce<Record<string, AiraloPackage[]>>(
+      (acc, pkg) => {
+        const key = pkg.country
+        if (!acc[key]) acc[key] = []
+        acc[key].push(pkg)
+        return acc
+      },
+      {}
+    )
+  }, [filteredPackages])
 
   if (loading) {
-    return <div className="p-10 text-center">Chargement…</div>
-  }
-
-  if (!partner) {
-    return (
-      <div className="p-10 text-center text-gray-500">
-        Aucun profil partenaire trouvé.
-      </div>
-    )
+    return <div className="p-10 text-center">Chargement des destinations…</div>
   }
 
   return (
-    <div className="p-10">
-      <h1 className="text-2xl font-bold mb-6">
-        Boutique partenaire — {partner.partner_code}
-      </h1>
+    <div className="min-h-screen bg-gray-50 px-6 py-10">
+      {/* HEADER */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <h1 className="text-3xl font-bold mb-2">Boutique eSIM</h1>
+        <p className="text-gray-600">
+          Sélectionnez une destination et choisissez un forfait eSIM
+        </p>
+      </div>
 
-      <ul className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {packages.map((p) => (
-          <li
-            key={p.id}
-            className="border rounded-xl p-6 hover:shadow-lg transition"
-          >
-            <h2 className="font-bold">{p.name}</h2>
-            <p className="text-sm text-gray-500">{p.description}</p>
-            <p className="mt-4 font-black text-lg">{p.price} €</p>
-          </li>
+      {/* SEARCH */}
+      <div className="max-w-7xl mx-auto mb-10">
+        <input
+          type="text"
+          placeholder="Rechercher une destination (ex: France, Japon...)"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full max-w-md border rounded-lg px-4 py-2 focus:outline-none focus:ring"
+        />
+      </div>
+
+      {/* DESTINATIONS */}
+      <div className="max-w-7xl mx-auto space-y-12">
+        {Object.entries(packagesByCountry).map(([country, pkgs]) => (
+          <section key={country}>
+            <h2 className="text-2xl font-semibold mb-4">{country}</h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pkgs.map((pkg) => (
+                <PackageCard key={pkg.id} pkg={pkg} />
+              ))}
+            </div>
+          </section>
         ))}
-      </ul>
+
+        {Object.keys(packagesByCountry).length === 0 && (
+          <p className="text-gray-500 text-center">
+            Aucune destination ne correspond à votre recherche.
+          </p>
+        )}
+      </div>
     </div>
   )
 }
