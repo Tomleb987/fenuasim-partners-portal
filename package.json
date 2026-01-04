@@ -9,26 +9,27 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "16.1.1",
-    "react": "latest",
-    "react-dom": "latest",
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/ssr": "latest",
     "@supabase/supabase-js": "latest",
-    "stripe": "^16.0.0",
-    "micro": "^10.0.1",
-    "nodemailer": "^6.9.14",
-    "resend": "^4.0.0",
+    "@tailwindcss/postcss": "latest",
     "lucide-react": "latest",
-    "tailwindcss": "latest",
-    "@tailwindcss/postcss": "latest"
+    "micro": "^10.0.1",
+    "next": "16.1.1",
+    "nodemailer": "^6.9.14",
+    "react": "latest",
+    "react-dom": "latest",
+    "resend": "^4.0.0",
+    "stripe": "^16.0.0",
+    "tailwindcss": "latest"
   },
   "devDependencies": {
-    "typescript": "latest",
     "@types/node": "latest",
+    "@types/nodemailer": "^6.4.14",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@types/nodemailer": "^6.4.14",
+    "autoprefixer": "latest",
     "postcss": "latest",
-    "autoprefixer": "latest"
+    "typescript": "latest"
   }
 }
