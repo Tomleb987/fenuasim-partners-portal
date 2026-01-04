@@ -21,21 +21,24 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 via-purple-50/30 to-orange-100 overflow-hidden font-sans text-gray-900">
+      {/* Éléments de design en arrière-plan */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-orange-300/30 rounded-full blur-3xl opacity-70 pointer-events-none"></div>
 
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="bg-white/80 backdrop-blur-2xl p-10 rounded-[2.5rem] shadow-2xl border border-white text-center">
           <div className="mb-10 flex flex-col items-center">
-            {/* Utilisation du composant Image de Next.js pour forcer la détection */}
-            <div className="relative h-20 w-48 mb-6">
+            {/* --- LOGO AGRANDI --- */}
+            {/* Passage de h-20 à h-40 pour doubler la hauteur */}
+            {/* Augmentation de la marge inférieure (mb-10) pour l'équilibre */}
+            <div className="relative h-40 w-auto mb-10">
               <Image 
                 src="/logo-1.png" 
                 alt="Fenuasim Logo" 
-                fill
+                height={160} // Hauteur explicite de 160px (h-40)
+                width={400}  // Largeur arbitraire suffisante pour le ratio
                 priority
-                className="object-contain"
-                unoptimized // Désactive l'optimisation temporairement pour tester l'affichage pur
+                className="object-contain h-full w-auto"
               />
             </div>
             
