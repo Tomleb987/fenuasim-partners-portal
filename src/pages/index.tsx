@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react"
-import { useRouter } from "next/router"
+// src/pages/index.tsx
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import { LogOut, TrendingUp, Tag, Calendar, User } from "lucide-react"
 import { supabaseBrowser } from "@/lib/supabase-browser"
 
 export default function PartnerDashboard() {
-  const supabase = supabaseBrowser()
-  const router = useRouter()
+  const supabase = useMemo(() => supabaseBrowser(), [])
 
   const [sales, setSales] = useState<any[]>([])
   const [profile, setProfile] = useState<any>(null)
@@ -23,7 +22,6 @@ export default function PartnerDashboard() {
       const user = sessionData.session?.user
 
       if (!user) {
-        // hard redirect (évite les états bizarres)
         window.location.href = "/login"
         return
       }
@@ -35,8 +33,7 @@ export default function PartnerDashboard() {
         .eq("id", user.id)
         .single()
 
-      if (profErr) {
-        // si profil absent / RLS / etc.
+      if (profErr || !prof) {
         if (mounted) {
           setProfile(null)
           setSales([])
@@ -68,7 +65,7 @@ export default function PartnerDashboard() {
 
     fetchStats()
 
-    // Bonus : si session change (logout ailleurs), on sort
+    // Si session change (logout ailleurs), on sort
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) window.location.href = "/login"
     })
@@ -77,7 +74,7 @@ export default function PartnerDashboard() {
       mounted = false
       sub.subscription.unsubscribe()
     }
-  }, [router, supabase])
+  }, [supabase])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -88,6 +85,59 @@ export default function PartnerDashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-purple-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" />
+      </div>
+    )
+  }
+
+  // Profil introuvable / pas encore activé (RLS, ligne manquante, etc.)
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] font-sans">
+        <nav className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 py-6 sticky top-0 z-50 shadow-sm">
+          <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <div className="relative h-16 w-40">
+              <Image
+                src="/logo-1.png"
+                alt="Fenuasim Logo"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-2 text-gray-400 font-bold hover:text-red-500 transition-all uppercase text-xs tracking-widest"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Déconnexion</span>
+            </button>
+          </div>
+        </nav>
+
+        <main className="max-w-xl mx-auto px-6 mt-16">
+          <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-100 border border-gray-100 p-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-[10px] font-black uppercase tracking-widest mb-4">
+              <User className="w-3 h-3" /> Accès incomplet
+            </div>
+            <h1 className="text-2xl font-extrabold text-gray-900">
+              Votre profil partenaire n’est pas encore activé
+            </h1>
+            <p className="text-gray-500 text-sm mt-2">
+              Nous ne trouvons pas votre fiche dans <span className="font-mono">partner_profiles</span>.
+              Contactez l’équipe FENUA SIM pour finaliser l’activation.
+            </p>
+
+            <button
+              onClick={handleSignOut}
+              className="mt-6 rounded-xl px-4 py-2 text-sm font-medium text-white
+                         bg-gradient-to-r from-orange-500 via-fuchsia-500 to-violet-600
+                         hover:brightness-110 transition"
+            >
+              Se déconnecter
+            </button>
+          </div>
+        </main>
       </div>
     )
   }
@@ -193,7 +243,9 @@ export default function PartnerDashboard() {
                       className="hover:bg-purple-50/30 transition-colors"
                     >
                       <td className="p-6 text-gray-600 font-medium text-sm">
-                        {new Date(order.created_at).toLocaleDateString("fr-FR")}
+                        {order.created_at
+                          ? new Date(order.created_at).toLocaleDateString("fr-FR")
+                          : "-"}
                       </td>
                       <td className="p-6 text-gray-400 font-mono text-xs italic">
                         #{String(order.id).slice(0, 8)}
@@ -210,10 +262,7 @@ export default function PartnerDashboard() {
                   ))
                 ) : (
                   <tr>
-                    <td
-                      colSpan={4}
-                      className="p-20 text-center text-gray-300 font-medium"
-                    >
+                    <td colSpan={4} className="p-20 text-center text-gray-300 font-medium">
                       Aucune vente enregistrée pour le moment.
                     </td>
                   </tr>
