@@ -5,10 +5,9 @@ module.exports = {
   ],
   theme: {
     extend: {
-      colors: {
-        'fenua-purple': '#9333ea', // Le violet de votre site
-        'fenua-orange': '#f97316', // L'orange de votre site
-      },
+      animation: {
+        'bounce-slow': 'bounce 3s infinite',
+      }
     },
   },
   plugins: [],
