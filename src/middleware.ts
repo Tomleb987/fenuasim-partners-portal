@@ -2,11 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,20 +23,12 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const pathname = request.nextUrl.pathname;
 
-  // Autoriser l'accès aux pages publiques (Login) et aux images
-  if (pathname.startsWith("/login") || pathname.match(/\.(png|jpg|ico|svg)$/)) {
-    return response;
-  }
-
-  // Rediriger vers la page de connexion si l'utilisateur n'est pas authentifié
-  if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
+  if (pathname.startsWith("/login") || pathname.match(/\.(png|jpg|ico|svg)$/)) return response;
+  if (!user) return NextResponse.redirect(new URL("/login", request.url));
 
   return response;
 }
 
 export const config = {
-  // Ce réglage protège tout le site SAUF les fichiers système et les APIs
   matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };
