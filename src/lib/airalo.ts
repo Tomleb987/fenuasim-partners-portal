@@ -3,6 +3,7 @@ const AIRALO_API_URL = process.env.AIRALO_API_URL;
 let cachedToken: string | null = null;
 let tokenExpiry: number | null = null;
 
+// Fonction pour obtenir le jeton de sécurité (Token)
 export async function getAiraloToken() {
   if (cachedToken && tokenExpiry && Date.now() < tokenExpiry) {
     return cachedToken;
@@ -25,7 +26,8 @@ export async function getAiraloToken() {
   return cachedToken;
 }
 
-export async function createAiraloOrder(airaloPackageId: string, email: string) {
+// Fonction pour commander réellement l'eSIM
+export async function createAiraloOrder(airaloPackageId: string) {
   const token = await getAiraloToken();
   const res = await fetch(`${AIRALO_API_URL}/orders`, {
     method: "POST",
@@ -45,6 +47,7 @@ export async function createAiraloOrder(airaloPackageId: string, email: string) 
   }
   
   const orderData = await res.json();
+  // On retourne les informations essentielles : ID, ICCID et le Code QR
   return {
     id: orderData.data.id,
     sim_iccid: orderData.data.sims?.[0]?.iccid,
