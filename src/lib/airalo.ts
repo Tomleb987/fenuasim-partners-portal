@@ -16,22 +16,16 @@ export async function getAiraloToken() {
       grant_type: "client_credentials",
     }),
   });
-  console.log("Airalo token response:", res);
+  
   const responseData = await res.json();
+  if (!responseData.data?.access_token) throw new Error("Impossible d'obtenir le token Airalo");
+  
   cachedToken = responseData.data.access_token;
-  tokenExpiry = Date.now() + (responseData.data.expires_in - 60) * 1000; // marge de 1 min
+  tokenExpiry = Date.now() + (responseData.data.expires_in - 60) * 1000; 
   return cachedToken;
 }
 
-export async function getAiraloPackages(countryCode: string) {
-  const token = await getAiraloToken();
-  const res = await fetch(`${AIRALO_API_URL}/packages?country_code=${countryCode}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return await res.json();
-}
-
-export async function createAiraloOrder({ packageId, email }: { packageId: string, email: string }) {
+export async function createAiraloOrder(airaloPackageId: string, email: string) {
   const token = await getAiraloToken();
   const res = await fetch(`${AIRALO_API_URL}/orders`, {
     method: "POST",
@@ -40,21 +34,20 @@ export async function createAiraloOrder({ packageId, email }: { packageId: strin
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      package_id: packageId,
-      email,
+      package_id: airaloPackageId,
+      quantity: 1,
     }),
   });
-  if (!res.ok) {
-    const error = await res.text();
-    throw new Error("Erreur Airalo: " + error);
-  }
-  return await res.json();
-}
 
-export async function getAiraloOrder(orderId: string) {
-  const token = await getAiraloToken();
-  const res = await fetch(`${AIRALO_API_URL}/orders/${orderId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return await res.json();
-} 
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error("Erreur Airalo: " + errorText);
+  }
+  
+  const orderData = await res.json();
+  return {
+    id: orderData.data.id,
+    sim_iccid: orderData.data.sims?.[0]?.iccid,
+    qr_code: orderData.data.sims?.[0]?.qrcode_url
+  };
+}
